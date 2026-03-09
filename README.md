@@ -200,6 +200,54 @@ So `gitw` uses the most compatible Git-native mechanism (`GIT_ASKPASS`) while st
 
 **Fail closed:** if git tries to prompt, it won’t; and if askpass isn’t configured (no creds), auth will fail rather than falling back to interactive prompts.
 
+## Signing `gitw` (recommended)
+
+You can (and should) code-sign the `gitw` binaries so you can trust what you’re executing and so macOS treats the tool as a first-class executable.
+
+### Option A: Developer ID (best, if you have it)
+
+```bash
+swift build -c release
+
+codesign --force --options runtime --timestamp \
+  --sign "Developer ID Application: Your Name (TEAMID)" \
+  .build/release/gitw .build/release/gitw-askpass
+
+codesign -dv --verbose=4 .build/release/gitw
+spctl -a -vv .build/release/gitw
+```
+
+### Option B: Self-signed "Code Signing" certificate (local use)
+
+1) Create a self-signed **Code Signing** certificate in **Keychain Access**.
+2) Sign the binaries:
+
+```bash
+swift build -c release
+
+codesign --force \
+  --sign "Your Self-Signed Cert Name" \
+  .build/release/gitw .build/release/gitw-askpass
+
+codesign -dv --verbose=4 .build/release/gitw
+```
+
+## Note on `git-credential-osxkeychain` (why we forbid it)
+
+Git’s credential helpers (including `git-credential-osxkeychain`) are designed to be called by Git as subprocesses.
+They typically communicate by writing/reading **plain text** credential material over stdin/stdout.
+
+That has two implications:
+
+- It’s easy to accidentally end up with credentials materialized as plaintext in process I/O, logs, or traces.
+- Any process running as you can invoke credential helpers directly.
+  (The helper still has to *successfully retrieve* a secret, but the interface is plain text by design.)
+
+`gitw` avoids this whole class by:
+
+- Disabling credential helpers for the `git` invocation.
+- Keeping the token in the Keychain and only releasing it via the short-lived broker.
+
 ## Limitations
 
 - This is intentionally restrictive: it’s for GitHub-over-HTTPS only.
