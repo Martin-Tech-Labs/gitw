@@ -9,6 +9,7 @@ private func usage() -> String {
       gitw login <https://github.com/owner/repo.git>
       gitw logout
       gitw whoami
+      gitw print-askpass-hash
       gitw <git-args...>
 
     Environment:
@@ -63,6 +64,10 @@ do {
     case "logout":
         try KeychainStore.delete()
         print("Deleted GitHub credentials for \(KeychainStore.server) from Keychain.")
+    case "print-askpass-hash":
+        let path = askpassPath()
+        let hash = try Hashing.sha256Hex(fileAtPath: path)
+        print(hash)
     case "login":
         guard args.count >= 2 else {
             throw GitwError.usage("login requires a GitHub HTTPS repo URL\n\n" + usage())

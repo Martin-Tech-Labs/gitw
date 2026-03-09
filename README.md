@@ -162,7 +162,7 @@ sequenceDiagram
   G->>A: invoke askpass("Password for https://github.com")
   A->>B: connect to UDS + send nonce + request "token"
   B-->>A: token (served once)
-  A-->>G: print token to stdout
+  A-->>G: print token to stdout (Git reads it from askpass stdout)
 
   G-->>W: git exits
   W->>B: stop broker, remove temp dir
@@ -171,9 +171,27 @@ sequenceDiagram
 ### What’s on disk vs in memory
 
 - **On disk:** only a temporary directory and a Unix domain socket *file* (IPC endpoint).
-  - No token is written to disk.
-- **In memory:** the broker holds the username/token briefly for the lifetime of the git invocation.
+  - No token is written to disk (the socket file is just an IPC endpoint).
+- **In memory:** the broker holds the username/token briefly for the lifetime of the git invocation, and sends it over the socket only when asked.
 - **At rest:** credentials live only in the macOS Keychain.
+
+### Askpass integrity / replacement risk
+
+If an attacker can replace the `gitw-askpass` binary on disk, they could steal credentials (because askpass receives the token and prints it to stdout for Git).
+
+To keep the model simple and fail-closed even for self-signed setups, `gitw` **hash-pins** the askpass helper:
+
+- Before launching Git, `gitw` computes the **SHA-256** of the sibling `gitw-askpass` binary.
+- If it doesn’t match the hardcoded expected hash, `gitw` aborts and does **not** run Git.
+
+Operational note: rebuilding `gitw-askpass` will change its hash. To update the pinned hash:
+
+```bash
+swift build -c release
+.build/release/gitw print-askpass-hash
+```
+
+Then update `Sources/GitwCore/AskpassTrust.swift` and rebuild.
 
 ### Protections (why invoking `gitw-askpass` directly doesn’t help)
 
