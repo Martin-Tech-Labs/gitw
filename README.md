@@ -52,14 +52,33 @@ codesign --force \
 codesign -dv --verbose=4 .build/release/gitw
 ```
 
-## Install (example)
+## Install
+
+You can install `gitw` anywhere, as long as `gitw` and `gitw-askpass` live in the **same directory**.
+
+### Recommended (no sudo): install into your user bin
+
+```bash
+mkdir -p "$HOME/bin"
+cp -f .build/release/gitw "$HOME/bin/gitw"
+cp -f .build/release/gitw-askpass "$HOME/bin/gitw-askpass"
+chmod 0755 "$HOME/bin/gitw" "$HOME/bin/gitw-askpass"
+```
+
+Make sure `$HOME/bin` is on your `PATH`.
+
+### System-wide install (optional)
+
+If you want `gitw` available for all users, you can install to `/usr/local/bin` (usually requires admin rights):
 
 ```bash
 sudo install -m 0755 .build/release/gitw /usr/local/bin/gitw
 sudo install -m 0755 .build/release/gitw-askpass /usr/local/bin/gitw-askpass
 ```
 
-They must live in the **same directory**.
+**What is `0755`?** It’s a file permission mode meaning:
+- owner: read/write/execute
+- group + others: read/execute
 
 ---
 
@@ -162,7 +181,7 @@ sequenceDiagram
   G->>A: invoke askpass("Password for https://github.com")
   A->>B: connect to UDS + send nonce + request "token"
   B-->>A: token (served once)
-  A-->>G: print token to stdout
+  A-->>G: print token to stdout (Git reads it from askpass stdout)
 
   G-->>W: git exits
   W->>B: stop broker, remove temp dir
@@ -171,9 +190,20 @@ sequenceDiagram
 ### What’s on disk vs in memory
 
 - **On disk:** only a temporary directory and a Unix domain socket *file* (IPC endpoint).
-  - No token is written to disk.
-- **In memory:** the broker holds the username/token briefly for the lifetime of the git invocation.
+  - No token is written to disk (the socket file is just an IPC endpoint).
+- **In memory:** the broker holds the username/token briefly for the lifetime of the git invocation, and sends it over the socket only when asked.
 - **At rest:** credentials live only in the macOS Keychain.
+
+### Askpass integrity / replacement risk
+
+`gitw` assumes `gitw-askpass` is trustworthy. If an attacker can replace the `gitw-askpass` binary on disk, they could steal credentials (because askpass receives the token and prints it to stdout for Git).
+
+Mitigations:
+
+- **Install directory permissions:** keep the install directory owned by you and not writable by others.
+  - Example: `$HOME/bin` should be `0755` and your binaries should not be group-writable.
+- **Code-sign both binaries** and consider running on a system where macOS signature enforcement matters (Gatekeeper / policy).
+- (Planned hardening) Have `gitw` verify the code signature of the sibling `gitw-askpass` before launching it.
 
 ### Protections (why invoking `gitw-askpass` directly doesn’t help)
 
