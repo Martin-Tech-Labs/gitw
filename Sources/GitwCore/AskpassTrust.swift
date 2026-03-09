@@ -8,5 +8,5 @@ public enum AskpassTrust {
     /// Update procedure:
     ///   swift build -c release
     ///   .build/release/gitw print-askpass-hash
-    public static let expectedAskpassSHA256 = "688787a6154832eadbe1126e835be7a25a701c3b88289cd80686629a40929555"
+    public static let expectedAskpassSHA256 = "be2fbaec374da7d6dbdcbf5096edd7e9932c1b30cc04a58cd2bc95aced0d21f4"
 }

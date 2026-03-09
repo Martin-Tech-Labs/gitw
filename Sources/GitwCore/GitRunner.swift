@@ -61,33 +61,25 @@ public enum GitRunner {
             guard FileManager.default.isExecutableFile(atPath: askpassPath) else {
                 throw GitwError.io("askpass helper not found or not executable at: \(askpassPath)")
             }
+            // Askpass integrity: hash-pin the installed helper before giving Git a chance to invoke it.
+            let actualHash = try Hashing.sha256Hex(fileAtPath: askpassPath)
+            guard actualHash == AskpassTrust.expectedAskpassSHA256 else {
+                throw GitwError.signature("gitw-askpass hash mismatch (expected \(AskpassTrust.expectedAskpassSHA256), got \(actualHash))")
+            }
+
             let nonce = randomNonce()
             let dir = FileManager.default.temporaryDirectory.appendingPathComponent("gitw-\(getpid())-\(UUID().uuidString)")
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: false, attributes: [FileAttributeKey.posixPermissions: 0o700])
             tmpDir = dir
             let sock = dir.appendingPathComponent("askpass.sock").path
 
-            // Askpass integrity: hash-pin the helper *and* avoid TOCTOU by copying it
-            // into our private temp dir and executing the copy.
-            let stagedAskpass = dir.appendingPathComponent("gitw-askpass").path
-            try FileManager.default.copyItem(atPath: askpassPath, toPath: stagedAskpass)
-            // Make the staged helper executable, but not writable.
-            try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: stagedAskpass)
-            let actualHash = try Hashing.sha256Hex(fileAtPath: stagedAskpass)
-            guard actualHash == AskpassTrust.expectedAskpassSHA256 else {
-                throw GitwError.signature("gitw-askpass hash mismatch (expected \(AskpassTrust.expectedAskpassSHA256), got \(actualHash))")
-            }
-            // Make the temp dir non-writable too (defense-in-depth).
-            // Note: same-user processes can still chmod it back; this is not a password boundary.
-            try? FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: dir.path)
-
             let cfg = BrokerConfig(socketPath: sock, nonce: nonce, timeoutSeconds: 20, username: creds.username, token: creds.token)
             let b = AskpassBroker(cfg: cfg)
             try b.start()
             broker = b
 
-            env["GIT_ASKPASS"] = stagedAskpass
-            env["SSH_ASKPASS"] = stagedAskpass
+            env["GIT_ASKPASS"] = askpassPath
+            env["SSH_ASKPASS"] = askpassPath
             env["GITW_SOCKET"] = sock
             env["GITW_NONCE"] = nonce
         } else {
