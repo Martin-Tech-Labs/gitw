@@ -61,6 +61,11 @@ public enum GitRunner {
             guard FileManager.default.isExecutableFile(atPath: askpassPath) else {
                 throw GitwError.io("askpass helper not found or not executable at: \(askpassPath)")
             }
+            // Askpass integrity: hash-pin the sibling helper to prevent swap attacks.
+            let actualHash = try Hashing.sha256Hex(fileAtPath: askpassPath)
+            guard actualHash == AskpassTrust.expectedAskpassSHA256 else {
+                throw GitwError.signature("gitw-askpass hash mismatch (expected \(AskpassTrust.expectedAskpassSHA256), got \(actualHash))")
+            }
             let nonce = randomNonce()
             let dir = FileManager.default.temporaryDirectory.appendingPathComponent("gitw-\(getpid())-\(UUID().uuidString)")
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: false, attributes: [FileAttributeKey.posixPermissions: 0o700])
