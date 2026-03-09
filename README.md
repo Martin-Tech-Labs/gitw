@@ -12,10 +12,22 @@ This is meant to reduce credential leakage and prevent accidental use of SSH / n
 
 ---
 
+## TL;DR (build + install)
+
+```bash
+# build
+swift build -c release
+
+# install (user-local)
+mkdir -p "$HOME/bin"
+cp -f .build/release/gitw "$HOME/bin/gitw"
+cp -f .build/release/gitw-askpass "$HOME/bin/gitw-askpass"
+chmod 0755 "$HOME/bin/gitw" "$HOME/bin/gitw-askpass"
+```
+
 ## Build
 
 ```bash
-cd gitw
 swift build -c release
 ```
 
@@ -181,8 +193,11 @@ If an attacker can replace the `gitw-askpass` binary on disk, they could steal c
 
 To keep the model simple and fail-closed even for self-signed setups, `gitw` **hash-pins** the askpass helper:
 
-- Before launching Git, `gitw` computes the **SHA-256** of the sibling `gitw-askpass` binary.
-- If it doesn’t match the hardcoded expected hash, `gitw` aborts and does **not** run Git.
+- Before launching Git, `gitw` stages `gitw-askpass` into its private `0700` temp directory.
+- It computes the **SHA-256** of the staged copy and compares it to the hardcoded expected hash.
+- If it doesn’t match, `gitw` aborts and does **not** run Git.
+
+This also prevents a TOCTOU race where `gitw-askpass` gets replaced *after* verification but *before* Git invokes it.
 
 Operational note: rebuilding `gitw-askpass` will change its hash. To update the pinned hash:
 
@@ -191,7 +206,7 @@ swift build -c release
 .build/release/gitw print-askpass-hash
 ```
 
-Then update `Sources/GitwCore/AskpassTrust.swift` and rebuild.
+Then paste that value into `Sources/GitwCore/AskpassTrust.swift` (`expectedAskpassSHA256`) and rebuild.
 
 ### Protections (why invoking `gitw-askpass` directly doesn’t help)
 
