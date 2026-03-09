@@ -59,7 +59,7 @@ sudo install -m 0755 .build/release/gitw /usr/local/bin/gitw
 sudo install -m 0755 .build/release/gitw-askpass /usr/local/bin/gitw-askpass
 ```
 
-They should live in the **same directory**, unless you set `GITW_ASKPASS_PATH`.
+They must live in the **same directory**.
 
 ---
 
@@ -95,11 +95,9 @@ gitw logout
 
 ## Environment variables
 
-- `GITW_NAME`, `GITW_EMAIL` (optional)
-  - If set, `gitw` exports these as `GIT_AUTHOR_NAME/EMAIL` and `GIT_COMMITTER_NAME/EMAIL`.
+None.
 
-- `GITW_ASKPASS_PATH`
-  - Override the path to `gitw-askpass`.
+(Deliberate security choice: `gitw` does not accept environment-variable overrides for identity or helper paths.)
 
 ---
 
@@ -139,21 +137,22 @@ sequenceDiagram
   participant W as gitw (wrapper)
   participant KC as macOS Keychain
   participant B as Broker (in-memory)
-  participant G as /usr/bin/git
+  participant G as /usr/bin/git (verified)
   participant A as gitw-askpass
 
   U->>W: gitw <git args>
   W->>KC: Load username + token (Keychain)
   W->>B: Start broker
-  Note over W,B: Create temp dir (0700)
-  Note over W,B: Create UDS socket in that dir
+  Note over W,B: Create temp dir (0700) under FileManager.temporaryDirectory
+  Note over W,B: (typically /var/folders/.../T/ on macOS)
+  Note over W,B: Create UDS socket at <tempdir>/askpass.sock
   Note over W,B: Generate random nonce
   W->>G: exec git with env:
   Note over W,G: GIT_ASKPASS=gitw-askpass
-  Note over W,G: GITW_SOCKET=/.../askpass.sock
+  Note over W,G: GITW_SOCKET=<tempdir>/askpass.sock
   Note over W,G: GITW_NONCE=<random>
   Note over W,G: GIT_TERMINAL_PROMPT=0
-  Note over W,G: credential.helper disabled
+  Note over W,G: credential.helper disabled via GIT_CONFIG_COUNT
 
   G->>A: invoke askpass("Username for https://github.com")
   A->>B: connect to UDS + send nonce + request "username"
