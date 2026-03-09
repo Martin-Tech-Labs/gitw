@@ -48,15 +48,6 @@ public enum GitRunner {
         env["GIT_CONFIG_KEY_1"] = "credential.useHttpPath"
         env["GIT_CONFIG_VALUE_1"] = "true"
 
-        // Identity env vars (optional), to avoid interactive prompts in some flows.
-        if let name = env["GITW_NAME"], !name.isEmpty {
-            env["GIT_AUTHOR_NAME"] = name
-            env["GIT_COMMITTER_NAME"] = name
-        }
-        if let email = env["GITW_EMAIL"], !email.isEmpty {
-            env["GIT_AUTHOR_EMAIL"] = email
-            env["GIT_COMMITTER_EMAIL"] = email
-        }
 
         // Scrub potentially dangerous overrides.
         env["GIT_ASKPASS"] = nil
