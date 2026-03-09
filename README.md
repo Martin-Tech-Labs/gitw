@@ -193,11 +193,13 @@ If an attacker can replace the `gitw-askpass` binary on disk, they could steal c
 
 To keep the model simple and fail-closed even for self-signed setups, `gitw` **hash-pins** the askpass helper:
 
-- Before launching Git, `gitw` stages `gitw-askpass` into its private `0700` temp directory.
+- Before launching Git, `gitw` stages `gitw-askpass` into its private `0700` temp directory, then chmods the staged copy to `0500` (read+execute only).
 - It computes the **SHA-256** of the staged copy and compares it to the hardcoded expected hash.
 - If it doesn’t match, `gitw` aborts and does **not** run Git.
 
 This also prevents a TOCTOU race where `gitw-askpass` gets replaced *after* verification but *before* Git invokes it.
+
+Note: chmod/permissions are **not** a password boundary for processes running as the same user; they mainly prevent cross-user tampering and accidental writes.
 
 Operational note: rebuilding `gitw-askpass` will change its hash. To update the pinned hash:
 

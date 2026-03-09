@@ -71,11 +71,15 @@ public enum GitRunner {
             // into our private temp dir and executing the copy.
             let stagedAskpass = dir.appendingPathComponent("gitw-askpass").path
             try FileManager.default.copyItem(atPath: askpassPath, toPath: stagedAskpass)
-            try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: stagedAskpass)
+            // Make the staged helper executable, but not writable.
+            try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: stagedAskpass)
             let actualHash = try Hashing.sha256Hex(fileAtPath: stagedAskpass)
             guard actualHash == AskpassTrust.expectedAskpassSHA256 else {
                 throw GitwError.signature("gitw-askpass hash mismatch (expected \(AskpassTrust.expectedAskpassSHA256), got \(actualHash))")
             }
+            // Make the temp dir non-writable too (defense-in-depth).
+            // Note: same-user processes can still chmod it back; this is not a password boundary.
+            try? FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: dir.path)
 
             let cfg = BrokerConfig(socketPath: sock, nonce: nonce, timeoutSeconds: 20, username: creds.username, token: creds.token)
             let b = AskpassBroker(cfg: cfg)
