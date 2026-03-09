@@ -83,6 +83,103 @@ codesign -dr - /path/to/git 2>&1
 ```
 
 
+## How authentication works (ASKPASS broker over Unix domain socket)
+
+Git’s HTTPS authentication model is awkward if you want *both* security and non-interactive UX:
+
+- Git needs a way to obtain credentials (username/password or token).
+- The safe defaults we want are:
+  - **no interactive prompts** (so automation and wrappers fail closed)
+  - **no credential helpers** (so Git doesn’t write secrets to disk or Keychain)
+  - **no tokens in argv or files**
+
+`gitw` achieves this by using Git’s supported `GIT_ASKPASS` mechanism, but **without** letting the askpass helper touch Keychain.
+Instead, `gitw` runs a short-lived *in-memory credential broker* and `gitw-askpass` talks to it over a Unix domain socket.
+
+### Diagram (sequence)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant U as User
+  participant W as gitw (wrapper)
+  participant KC as macOS Keychain
+  participant B as Broker (in-memory)
+  participant G as /usr/bin/git
+  participant A as gitw-askpass
+
+  U->>W: gitw <git args>
+  W->>KC: Load username + token (Keychain)
+  W->>B: Start broker
+  Note over W,B: Create temp dir (0700)
+  Note over W,B: Create UDS socket in that dir
+  Note over W,B: Generate random nonce
+  W->>G: exec git with env:
+  Note over W,G: GIT_ASKPASS=gitw-askpass
+  Note over W,G: GITW_SOCKET=/.../askpass.sock
+  Note over W,G: GITW_NONCE=<random>
+  Note over W,G: GIT_TERMINAL_PROMPT=0
+  Note over W,G: credential.helper disabled
+
+  G->>A: invoke askpass("Username for https://github.com")
+  A->>B: connect to UDS + send nonce + request "username"
+  B-->>A: username (served once)
+  A-->>G: print username to stdout
+
+  G->>A: invoke askpass("Password for https://github.com")
+  A->>B: connect to UDS + send nonce + request "token"
+  B-->>A: token (served once)
+  A-->>G: print token to stdout
+
+  G-->>W: git exits
+  W->>B: stop broker, remove temp dir
+```
+
+### What’s on disk vs in memory
+
+- **On disk:** only a temporary directory and a Unix domain socket *file* (IPC endpoint).
+  - No token is written to disk.
+- **In memory:** the broker holds the username/token briefly for the lifetime of the git invocation.
+- **At rest:** credentials live only in the macOS Keychain.
+
+### Protections (why invoking `gitw-askpass` directly doesn’t help)
+
+`gitw-askpass` is intentionally dumb and defensive:
+
+- It **does not** read Keychain.
+- It will only return a credential if **all** of the following are true:
+  1) `GITW_SOCKET` points to a *live* broker socket.
+  2) `GITW_NONCE` matches the broker’s random nonce.
+  3) The broker session has not expired and the requested secret hasn’t already been served.
+
+If you run `gitw-askpass` by itself (or with wrong env vars), it fails closed and prints nothing useful.
+
+### Why Unix domain sockets (UDS) instead of pipes
+
+Pipes look simpler on paper, but they’re brittle with Git’s askpass architecture:
+
+- Git spawns the askpass helper as a *separate process* later. With pipes you’d need to somehow pass pipe **file descriptors** across *multiple* exec/spawn hops (gitw → git → askpass) and ensure none of the processes closes unknown FDs.
+- Many programs defensively close extraneous file descriptors to avoid leaks; relying on FD inheritance across versions is fragile.
+- UDS uses a **pathname** (socket file) so the askpass helper can always locate the broker using just `GITW_SOCKET`.
+
+Security-wise, UDS is also a good fit here:
+
+- The socket lives in a freshly created temp directory with permissions `0700`, so other users can’t traverse to it.
+- The broker additionally requires a random nonce (capability token) to serve credentials.
+- The broker serves **each secret at most once** and then shuts down quickly.
+
+### Why gitw is more complex than ghw
+
+`ghw` can inject `GH_TOKEN` directly into the GitHub CLI because `gh` is *designed* for that environment-variable auth flow.
+
+Git, on the other hand:
+
+- does not accept a single "token env var" for HTTPS auth,
+- will happily consult credential helpers,
+- and may prompt interactively unless disabled.
+
+So `gitw` uses the most compatible Git-native mechanism (`GIT_ASKPASS`) while still keeping credentials in Keychain and avoiding plaintext token exposure.
+
 ## Security notes / design
 
 - Credentials are stored only in the **macOS Keychain** (`kSecClassInternetPassword`, server `github.com`).
