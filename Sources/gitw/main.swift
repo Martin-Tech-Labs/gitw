@@ -12,14 +12,14 @@ private func usage() -> String {
       gitw <git-args...>
 
     Environment:
-      GITW_NAME / GITW_EMAIL   (optional) author/committer identity
-      GITW_ASKPASS_PATH       override gitw-askpass path
+      (none)
 
     """
 }
 
 private func askpassPath() -> String {
-    if let p = ProcessInfo.processInfo.environment["GITW_ASKPASS_PATH"], !p.isEmpty { return p }
+    // Security policy: do not allow overriding the askpass helper path via env.
+    // The helper must be the sibling executable next to `gitw`.
 
     func resolveExecutablePath() -> String {
         let argv0 = CommandLine.arguments.first ?? "gitw"
@@ -36,7 +36,6 @@ private func askpassPath() -> String {
         return argv0
     }
 
-    // Default: sibling executable next to gitw.
     let exe = resolveExecutablePath()
     let url = URL(fileURLWithPath: exe)
     let dir = url.deletingLastPathComponent()
