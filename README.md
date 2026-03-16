@@ -118,7 +118,7 @@ Notes:
 `login` **verifies** the token by running `git ls-remote` via the broker and **only stores on success**.
 
 ```bash
-gitw login https://github.com/OWNER/REPO.git
+gitw login --as <github_username> https://github.com/OWNER/REPO.git
 ```
 
 You’ll be prompted for:
@@ -129,16 +129,16 @@ You’ll be prompted for:
 ### 2) Use `gitw` like `git`
 
 ```bash
-gitw clone https://github.com/OWNER/REPO.git
-gitw fetch
-gitw push
+gitw clone https://github.com/OWNER/REPO.git --as <github_username>
+gitw fetch --as <github_username>
+gitw push --as <github_username>
 ```
 
 ### 3) Inspect / remove credentials
 
 ```bash
-gitw whoami
-gitw logout
+gitw whoami --as <github_username>
+gitw logout --as <github_username>
 ```
 
 ## Environment variables
