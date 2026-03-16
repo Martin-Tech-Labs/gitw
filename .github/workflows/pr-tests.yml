@@ -37,8 +37,15 @@ jobs:
           set -o pipefail
           swift test 2>&1 | tee /tmp/swift-test.log
 
-      - name: Run acceptance smoke tests
-        run: ./scripts/acceptance-tests.sh
+      - name: Run acceptance smoke tests (capture log)
+        run: |
+          set -o pipefail
+          ./scripts/acceptance-tests.sh 2>&1 | tee /tmp/acceptance.log
+
+      - name: Convert acceptance output to JUnit
+        if: always()
+        run: |
+          ./scripts/acceptance-to-junit.py /tmp/acceptance.log /tmp/acceptance.junit.xml
 
       - name: Convert unit test output to JUnit
         if: always()
@@ -54,6 +61,15 @@ jobs:
           reporter: java-junit
           fail-on-error: false
 
+      - name: Publish acceptance report
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Acceptance Smoke Tests
+          path: /tmp/acceptance.junit.xml
+          reporter: java-junit
+          fail-on-error: false
+
       - name: Job summary
         if: always()
         run: |
@@ -62,4 +78,7 @@ jobs:
             echo "";
             echo "### Unit tests executed";
             grep -E '^◇ Test ' /tmp/swift-test.log | sed -E 's/^◇ Test (.*) started\.$/- \1/' || true;
+            echo "";
+            echo "### Acceptance checks";
+            grep -E '^\[acceptance\] ok:' /tmp/acceptance.log | sed -E 's/^\[acceptance\] ok: /- ✅ /' || true;
           } >> "$GITHUB_STEP_SUMMARY"
