@@ -25,4 +25,8 @@ jobs:
             ${{ runner.os }}-spm-
 
       - name: Run tests
+        env:
+          # GitHub Actions runners may have a differently signed /usr/bin/git.
+          # We keep signature enforcement in release builds; this bypass is DEBUG-only.
+          GITW_SKIP_GIT_SIGNATURE_CHECK: "1"
         run: swift test
