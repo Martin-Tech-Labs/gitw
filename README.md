@@ -115,6 +115,20 @@ What the tests cover (high level):
 Notes:
 - Socket-based tests use `/tmp` to keep Unix-domain-socket paths under the `sockaddr_un` limit.
 
+### Acceptance / smoke tests
+
+Location:
+- `scripts/acceptance-tests.sh`
+
+Run locally:
+
+```bash
+./scripts/acceptance-tests.sh
+```
+
+What they cover (high level):
+- `gitw` fails closed when `--as <alias>` is missing.
+
 ## Usage
 
 ### 1) Login (store a PAT in Keychain)
