@@ -1,0 +1,31 @@
+name: PR Tests
+
+on:
+  pull_request:
+
+jobs:
+  swift-test:
+    name: swift-test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Run tests
+        env:
+          # GitHub Actions runners may have a differently signed /usr/bin/git.
+          # Signature enforcement remains required in release builds.
+          GITW_SKIP_GIT_SIGNATURE_CHECK: "1"
+        run: swift test
