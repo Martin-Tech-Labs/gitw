@@ -37,6 +37,9 @@ jobs:
           set -o pipefail
           swift test 2>&1 | tee /tmp/swift-test.log
 
+      - name: Run acceptance smoke tests
+        run: ./scripts/acceptance-tests.sh
+
       - name: Convert unit test output to JUnit
         if: always()
         run: |

@@ -112,7 +112,8 @@ do {
 } catch let e as GitwError {
     switch e {
     case .usage(let msg):
-        die(msg, code: 0)
+        // Usage here indicates an error in invocation; fail closed.
+        die(msg, code: 2)
     default:
         die("gitw: \(e)")
     }
