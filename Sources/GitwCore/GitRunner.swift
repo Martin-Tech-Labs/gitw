@@ -64,8 +64,14 @@ public enum GitRunner {
             }
 
             let nonce = randomNonce()
-            let dir = FileManager.default.temporaryDirectory.appendingPathComponent("gitw-\(getpid())-\(UUID().uuidString)")
-            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: false, attributes: [FileAttributeKey.posixPermissions: 0o700])
+            // Use /tmp to keep Unix domain socket paths short enough for sockaddr_un.
+            // (macOS limits sun_path to ~104 bytes)
+            let shortId = String(UUID().uuidString.prefix(8))
+            let dir = URL(fileURLWithPath: "/tmp")
+                .appendingPathComponent("gitw-\(getpid())-\(shortId)")
+            try FileManager.default.createDirectory(at: dir,
+                                                    withIntermediateDirectories: false,
+                                                    attributes: [FileAttributeKey.posixPermissions: 0o700])
             tmpDir = dir
             let sock = dir.appendingPathComponent("askpass.sock").path
 
