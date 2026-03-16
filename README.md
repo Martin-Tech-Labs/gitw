@@ -1,6 +1,6 @@
 # gitw
 
-[![PR Tests](https://github.com/Martin-Tech-Labs/gitw/actions/workflows/pr-tests.yml/badge.svg)](https://github.com/Martin-Tech-Labs/gitw/actions/workflows/pr-tests.yml)
+[![Main](https://github.com/Martin-Tech-Labs/gitw/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/Martin-Tech-Labs/gitw/actions/workflows/main.yml)
 
 `gitw` is a **secure Git wrapper for macOS** that:
 
