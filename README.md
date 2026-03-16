@@ -22,13 +22,11 @@ This is meant to reduce credential leakage and prevent accidental use of SSH / n
 
 ```bash
 # build
-swift build -c release
+./scripts/release-build.sh
 
-# install (user-local)
-mkdir -p "$HOME/bin"
-cp -f .build/release/gitw "$HOME/bin/gitw"
-cp -f .build/release/gitw-askpass "$HOME/bin/gitw-askpass"
-chmod 0755 "$HOME/bin/gitw" "$HOME/bin/gitw-askpass"
+# install (admin-owned; required for our threat model)
+sudo install -m 0755 .build/release/gitw /usr/local/bin/gitw
+sudo install -m 0755 .build/release/gitw-askpass /usr/local/bin/gitw-askpass
 ```
 
 ## Build
@@ -83,7 +81,7 @@ codesign --force \
 codesign -dv --verbose=4 .build/release/gitw
 ```
 
-## Install (example)
+## Install (required for our threat model)
 
 ```bash
 sudo install -m 0755 .build/release/gitw /usr/local/bin/gitw
