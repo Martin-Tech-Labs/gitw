@@ -2,5 +2,5 @@ public enum AskpassTrust {
     /// Hardcoded SHA-256 of the trusted `gitw-askpass` binary.
     ///
     /// This file is generated during the release build.
-    public static let expectedAskpassSHA256 = "d15695cbf5ee3d58d092a67ead1ee3fb0b25ea10eb9054a9b8ea48f43cced1e3"
+    public static let expectedAskpassSHA256 = "@ASKPASS_SHA256@"
 }
