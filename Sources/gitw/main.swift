@@ -6,10 +6,10 @@ private func usage() -> String {
     gitw - secure Git wrapper (GitHub HTTPS + Keychain)
 
     Usage:
-      gitw login --as <github_username> <https://github.com/owner/repo.git>
-      gitw logout --as <github_username>
-      gitw whoami --as <github_username>
-      gitw <git-args...> --as <github_username>
+      gitw login --as <alias> <https://github.com/owner/repo.git>
+      gitw logout --as <alias>
+      gitw whoami --as <alias>
+      gitw <git-args...> --as <alias>
 
     Environment:
       (none)
@@ -60,30 +60,31 @@ do {
     }
 
     // `--as` is mandatory for any operation that reads/writes credentials.
-    let asUser = popFlag("--as")
+    // It is an alias selector (not necessarily the GitHub username).
+    let asAlias = popFlag("--as")
 
     let cmd = args[0]
     switch cmd {
     case "-h", "--help", "help":
         throw GitwError.usage(usage())
     case "whoami":
-        guard let user = asUser, !user.isEmpty else {
-            throw GitwError.usage("whoami requires --as <github_username>\n\n" + usage())
+        guard let alias = asAlias, !alias.isEmpty else {
+            throw GitwError.usage("whoami requires --as <alias>\n\n" + usage())
         }
-        if let c = try KeychainStore.load(username: user) {
+        if let c = try KeychainStore.load(alias: alias) {
             print(c.username)
         } else {
-            die("No GitHub credentials in Keychain for \(user).", code: 1)
+            die("No GitHub credentials in Keychain for alias \(alias).", code: 1)
         }
     case "logout":
-        guard let user = asUser, !user.isEmpty else {
-            throw GitwError.usage("logout requires --as <github_username>\n\n" + usage())
+        guard let alias = asAlias, !alias.isEmpty else {
+            throw GitwError.usage("logout requires --as <alias>\n\n" + usage())
         }
-        try KeychainStore.delete(username: user)
-        print("Deleted GitHub credentials for \(user) (\(KeychainStore.server)) from Keychain.")
+        try KeychainStore.delete(alias: alias)
+        print("Deleted GitHub credentials for alias \(alias) (\(KeychainStore.server)) from Keychain.")
     case "login":
-        guard let user = asUser, !user.isEmpty else {
-            throw GitwError.usage("login requires --as <github_username>\n\n" + usage())
+        guard let alias = asAlias, !alias.isEmpty else {
+            throw GitwError.usage("login requires --as <alias>\n\n" + usage())
         }
         guard args.count >= 2 else {
             throw GitwError.usage("login requires a GitHub HTTPS repo URL\n\n" + usage())
@@ -91,8 +92,8 @@ do {
         let repoURL = args[1]
         try URLPolicy.validateGitArguments([repoURL])
 
-        // Username is the identity selector; don't prompt for it.
-        let username = user
+        // True alias support: prompt for the actual GitHub username.
+        let username = try TTY.readLine(prompt: "GitHub username: ")
         let token = try TTY.readSecret(prompt: "GitHub personal access token: ")
 
         // Verify using ls-remote via askpass broker (without storing unless it works).
@@ -105,13 +106,13 @@ do {
             die("Login check failed (git exit \(status)). Not saved.", code: status)
         }
 
-        try KeychainStore.save(GitHubCredentials(username: username, token: token))
-        print("Credentials stored in Keychain for \(username) (\(KeychainStore.server)).")
+        try KeychainStore.save(alias: alias, creds: GitHubCredentials(username: username, token: token))
+        print("Credentials stored in Keychain for alias \(alias) (user \(username), \(KeychainStore.server)).")
     default:
-        guard let user = asUser, !user.isEmpty else {
-            throw GitwError.usage("git invocation requires --as <github_username>\n\n" + usage())
+        guard let alias = asAlias, !alias.isEmpty else {
+            throw GitwError.usage("git invocation requires --as <alias>\n\n" + usage())
         }
-        let creds = try KeychainStore.load(username: user)
+        let creds = try KeychainStore.load(alias: alias)
         let status = try GitRunner.runGit(args: args, askpassPath: askpassPath(), creds: creds)
         exit(status)
     }
