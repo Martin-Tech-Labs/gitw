@@ -1,6 +1,8 @@
 # gitw
 
 [![Main](https://github.com/Martin-Tech-Labs/gitw/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/Martin-Tech-Labs/gitw/actions/workflows/main.yml)
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+![Swift 6.1+](https://img.shields.io/badge/Swift-6.1%2B-orange.svg?logo=swift)
 
 `gitw` is a **secure Git wrapper for macOS** that:
 
