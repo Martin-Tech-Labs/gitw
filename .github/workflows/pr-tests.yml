@@ -3,6 +3,11 @@ name: PR Tests
 on:
   pull_request:
 
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
 jobs:
   swift-test:
     name: swift-test
@@ -23,9 +28,35 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-spm-
 
-      - name: Run tests
+      - name: Run tests (capture log)
         env:
           # GitHub Actions runners may have a differently signed /usr/bin/git.
           # Signature enforcement remains required in release builds.
           GITW_SKIP_GIT_SIGNATURE_CHECK: "1"
-        run: swift test
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tee /tmp/swift-test.log
+
+      - name: Convert unit test output to JUnit
+        if: always()
+        run: |
+          ./scripts/swift-test-to-junit.py /tmp/swift-test.log /tmp/swift-test.junit.xml
+
+      - name: Publish unit test report
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Swift Unit Tests
+          path: /tmp/swift-test.junit.xml
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## Tests (PR)";
+            echo "";
+            echo "### Unit tests executed";
+            grep -E '^◇ Test ' /tmp/swift-test.log | sed -E 's/^◇ Test (.*) started\.$/- \1/' || true;
+          } >> "$GITHUB_STEP_SUMMARY"

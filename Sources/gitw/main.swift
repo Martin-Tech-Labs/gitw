@@ -61,59 +61,52 @@ do {
 
     // `--as` is mandatory for any operation that reads/writes credentials.
     // It is an alias selector (not necessarily the GitHub username).
-    let asAlias = popFlag("--as")
+    guard let alias = popFlag("--as"), !alias.isEmpty else {
+        throw GitwError.usage("Missing --as <alias>\n\n" + usage())
+    }
 
     let cmd = args[0]
+
+    let keychain = RealKeychainProvider()
+    let app = GitwApp(
+        keychain: keychain,
+        git: RealGitRunner(),
+        askpassPath: askpassPath
+    )
+
     switch cmd {
     case "-h", "--help", "help":
         throw GitwError.usage(usage())
     case "whoami":
-        guard let alias = asAlias, !alias.isEmpty else {
-            throw GitwError.usage("whoami requires --as <alias>\n\n" + usage())
-        }
-        if let c = try KeychainStore.load(alias: alias) {
-            print(c.username)
-        } else {
+        let creds = try keychain.load(alias: alias)
+        guard let creds else {
             die("No GitHub credentials in Keychain for alias \(alias).", code: 1)
         }
+        print(creds.username)
+        exit(0)
     case "logout":
-        guard let alias = asAlias, !alias.isEmpty else {
-            throw GitwError.usage("logout requires --as <alias>\n\n" + usage())
-        }
-        try KeychainStore.delete(alias: alias)
+        _ = try app.run(.logout(alias: alias), ttyReadLine: TTY.readLine(prompt:), ttyReadSecret: TTY.readSecret(prompt:))
         print("Deleted GitHub credentials for alias \(alias) (\(KeychainStore.server)) from Keychain.")
+        exit(0)
     case "login":
-        guard let alias = asAlias, !alias.isEmpty else {
-            throw GitwError.usage("login requires --as <alias>\n\n" + usage())
-        }
         guard args.count >= 2 else {
             throw GitwError.usage("login requires a GitHub HTTPS repo URL\n\n" + usage())
         }
         let repoURL = args[1]
-        try URLPolicy.validateGitArguments([repoURL])
-
-        // True alias support: prompt for the actual GitHub username.
-        let username = try TTY.readLine(prompt: "GitHub username: ")
-        let token = try TTY.readSecret(prompt: "GitHub personal access token: ")
-
-        // Verify using ls-remote via askpass broker (without storing unless it works).
-        let status = try GitRunner.runGit(
-            args: ["ls-remote", repoURL],
-            askpassPath: askpassPath(),
-            creds: GitHubCredentials(username: username, token: token)
-        )
-        guard status == 0 else {
-            die("Login check failed (git exit \(status)). Not saved.", code: status)
+        // We keep the prompts + verification inside GitwApp, but printing stays here.
+        let status = try app.run(.login(alias: alias, repoURL: repoURL), ttyReadLine: TTY.readLine(prompt:), ttyReadSecret: TTY.readSecret(prompt:))
+        if status == 0 {
+            // Re-load to show the effective username stored for this alias.
+            if let c = try keychain.load(alias: alias) {
+                print("Credentials stored in Keychain for alias \(alias) (user \(c.username), \(KeychainStore.server)).")
+            } else {
+                print("Credentials stored in Keychain for alias \(alias) (\(KeychainStore.server)).")
+            }
         }
-
-        try KeychainStore.save(alias: alias, creds: GitHubCredentials(username: username, token: token))
-        print("Credentials stored in Keychain for alias \(alias) (user \(username), \(KeychainStore.server)).")
+        exit(status)
     default:
-        guard let alias = asAlias, !alias.isEmpty else {
-            throw GitwError.usage("git invocation requires --as <alias>\n\n" + usage())
-        }
-        let creds = try KeychainStore.load(alias: alias)
-        let status = try GitRunner.runGit(args: args, askpassPath: askpassPath(), creds: creds)
+        // Everything else is a git invocation.
+        let status = try app.run(.git(alias: alias, args: args), ttyReadLine: TTY.readLine(prompt:), ttyReadSecret: TTY.readSecret(prompt:))
         exit(status)
     }
 } catch let e as GitwError {
