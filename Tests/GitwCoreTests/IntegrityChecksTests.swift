@@ -6,6 +6,7 @@ import Testing
 struct IntegrityChecksTests {
     @Test
     func resolveGitPathUsesSystemGit() throws {
+        // Note: CI may set GITW_SKIP_GIT_SIGNATURE_CHECK=1 (DEBUG-only bypass).
         let env = try GitRunner.resolveGitPath()
         #expect(env.gitPath == "/usr/bin/git")
         #expect(!env.requirementUsed.isEmpty)

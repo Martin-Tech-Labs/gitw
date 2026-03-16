@@ -75,6 +75,27 @@ They must live in the **same directory**.
 
 ---
 
+## Tests
+
+Run locally:
+
+```bash
+swift test
+```
+
+What the tests cover (high level):
+
+- **Askpass broker (UDS) behavior**
+  - Requires the per-run nonce (wrong nonce => no response)
+  - Serves username then token once
+  - Closes and unlinks the socket after both secrets are served
+- **Integrity / hardening checks**
+  - Exercises the `/usr/bin/git` resolution + code signature check path
+  - Ensures askpass SHA-256 pinning fails closed on mismatch
+
+Notes:
+- Socket-based tests use `/tmp` to keep Unix-domain-socket paths under the `sockaddr_un` limit.
+
 ## Usage
 
 ### 1) Login (store a PAT in Keychain)

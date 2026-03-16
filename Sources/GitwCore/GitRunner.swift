@@ -21,7 +21,19 @@ public enum GitRunner {
     public static func resolveGitPath() throws -> GitEnvironment {
         let systemGit = "/usr/bin/git"
         let req = SignatureVerifier.systemGitRequirement
+
+        // In production we always enforce the code signature policy.
+        // In tests/CI, GitHub Actions runners may have a shimmed or differently-signed /usr/bin/git.
+        // Allow opting out *only in DEBUG* to keep CI stable while preserving the runtime guarantee.
+        #if DEBUG
+        let skip = ProcessInfo.processInfo.environment["GITW_SKIP_GIT_SIGNATURE_CHECK"] == "1"
+        if !skip {
+            try SignatureVerifier.check(path: systemGit, requirement: req)
+        }
+        #else
         try SignatureVerifier.check(path: systemGit, requirement: req)
+        #endif
+
         return GitEnvironment(gitPath: systemGit, requirementUsed: req)
     }
 
