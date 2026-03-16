@@ -49,23 +49,7 @@ public enum GitRunner {
             try validateRepoRemotes(gitPath: gitEnv.gitPath, prefixArgs: extractGitPrefixArgs(args))
         }
 
-        var env = ProcessInfo.processInfo.environment
-        // Fail closed: never allow terminal prompting.
-        env["GIT_TERMINAL_PROMPT"] = "0"
-
-        // Disable helpers so creds never spill to disk, keychain via git, or other helpers.
-        env["GIT_CONFIG_COUNT"] = "2"
-        env["GIT_CONFIG_KEY_0"] = "credential.helper"
-        env["GIT_CONFIG_VALUE_0"] = ""
-        env["GIT_CONFIG_KEY_1"] = "credential.useHttpPath"
-        env["GIT_CONFIG_VALUE_1"] = "true"
-
-
-        // Scrub potentially dangerous overrides.
-        env["GIT_ASKPASS"] = nil
-        env["SSH_ASKPASS"] = nil
-        env["GIT_SSH"] = nil
-        env["GIT_SSH_COMMAND"] = nil
+        var env = buildGitEnvironment(base: ProcessInfo.processInfo.environment)
 
         var broker: AskpassBroker?
         var tmpDir: URL?
@@ -90,10 +74,10 @@ public enum GitRunner {
             try b.start()
             broker = b
 
-            env["GIT_ASKPASS"] = askpassPath
-            env["SSH_ASKPASS"] = askpassPath
-            env["GITW_SOCKET"] = sock
-            env["GITW_NONCE"] = nonce
+            env = buildGitEnvironment(base: env,
+                                     askpassPath: askpassPath,
+                                     brokerSocket: sock,
+                                     brokerNonce: nonce)
         } else {
             // No credentials. Askpass is not set; git will fail closed if it prompts.
         }
@@ -116,6 +100,40 @@ public enum GitRunner {
         try p.run()
         p.waitUntilExit()
         return p.terminationStatus
+    }
+
+    /// Build the environment for invoking `git`.
+    /// Kept as a separate function so it can be unit-tested.
+    public static func buildGitEnvironment(base: [String: String],
+                                          askpassPath: String? = nil,
+                                          brokerSocket: String? = nil,
+                                          brokerNonce: String? = nil) -> [String: String] {
+        var env = base
+
+        // Fail closed: never allow terminal prompting.
+        env["GIT_TERMINAL_PROMPT"] = "0"
+
+        // Disable helpers so creds never spill to disk, keychain via git, or other helpers.
+        env["GIT_CONFIG_COUNT"] = "2"
+        env["GIT_CONFIG_KEY_0"] = "credential.helper"
+        env["GIT_CONFIG_VALUE_0"] = ""
+        env["GIT_CONFIG_KEY_1"] = "credential.useHttpPath"
+        env["GIT_CONFIG_VALUE_1"] = "true"
+
+        // Scrub potentially dangerous overrides.
+        env["GIT_ASKPASS"] = nil
+        env["SSH_ASKPASS"] = nil
+        env["GIT_SSH"] = nil
+        env["GIT_SSH_COMMAND"] = nil
+
+        if let askpassPath, let brokerSocket, let brokerNonce {
+            env["GIT_ASKPASS"] = askpassPath
+            env["SSH_ASKPASS"] = askpassPath
+            env["GITW_SOCKET"] = brokerSocket
+            env["GITW_NONCE"] = brokerNonce
+        }
+
+        return env
     }
 
     public static func runAndCapture(_ path: String, _ args: [String]) throws -> String {
