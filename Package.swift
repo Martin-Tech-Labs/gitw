@@ -18,7 +18,8 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "GitwCore"
+            name: "GitwCore",
+            exclude: ["AskpassTrust.swift.in"]
         ),
         .executableTarget(
             name: "gitw",

@@ -1,5 +1,7 @@
 # gitw
 
+[![PR Tests](https://github.com/Martin-Tech-Labs/gitw/actions/workflows/pr-tests.yml/badge.svg)](https://github.com/Martin-Tech-Labs/gitw/actions/workflows/pr-tests.yml)
+
 `gitw` is a **secure Git wrapper for macOS** that:
 
 - Allows **GitHub HTTPS only** (`https://github.com/...`).
@@ -27,9 +29,22 @@ chmod 0755 "$HOME/bin/gitw" "$HOME/bin/gitw-askpass"
 
 ## Build
 
+### Development build
+
 ```bash
 swift build -c release
 ```
+
+### Release build (auto-pins askpass hash)
+
+This project pins the SHA-256 of the `gitw-askpass` helper in `AskpassTrust.swift`.
+To avoid manual copy/paste, use:
+
+```bash
+./scripts/release-build.sh
+```
+
+This builds `gitw-askpass`, computes its SHA-256, generates `Sources/GitwCore/AskpassTrust.swift`, then builds `gitw`.
 
 Binaries:
 
