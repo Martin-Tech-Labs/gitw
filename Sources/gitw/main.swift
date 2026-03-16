@@ -6,11 +6,10 @@ private func usage() -> String {
     gitw - secure Git wrapper (GitHub HTTPS + Keychain)
 
     Usage:
-      gitw login <https://github.com/owner/repo.git>
-      gitw logout
-      gitw whoami
-      gitw print-askpass-hash
-      gitw <git-args...>
+      gitw login --as <github_username> <https://github.com/owner/repo.git>
+      gitw logout --as <github_username>
+      gitw whoami --as <github_username>
+      gitw <git-args...> --as <github_username>
 
     Environment:
       (none)
@@ -47,35 +46,53 @@ do {
     var args = CommandLine.arguments
     _ = args.removeFirst()
 
+    func popFlag(_ name: String) -> String? {
+        if let i = args.firstIndex(of: name), i + 1 < args.count {
+            let v = args[i + 1]
+            args.removeSubrange(i...i+1)
+            return v
+        }
+        return nil
+    }
+
     if args.isEmpty {
         throw GitwError.usage(usage())
     }
+
+    // `--as` is mandatory for any operation that reads/writes credentials.
+    let asUser = popFlag("--as")
 
     let cmd = args[0]
     switch cmd {
     case "-h", "--help", "help":
         throw GitwError.usage(usage())
     case "whoami":
-        if let c = try KeychainStore.load() {
+        guard let user = asUser, !user.isEmpty else {
+            throw GitwError.usage("whoami requires --as <github_username>\n\n" + usage())
+        }
+        if let c = try KeychainStore.load(username: user) {
             print(c.username)
         } else {
-            die("No GitHub credentials in Keychain.", code: 1)
+            die("No GitHub credentials in Keychain for \(user).", code: 1)
         }
     case "logout":
-        try KeychainStore.delete()
-        print("Deleted GitHub credentials for \(KeychainStore.server) from Keychain.")
-    case "print-askpass-hash":
-        let path = askpassPath()
-        let hash = try Hashing.sha256Hex(fileAtPath: path)
-        print(hash)
+        guard let user = asUser, !user.isEmpty else {
+            throw GitwError.usage("logout requires --as <github_username>\n\n" + usage())
+        }
+        try KeychainStore.delete(username: user)
+        print("Deleted GitHub credentials for \(user) (\(KeychainStore.server)) from Keychain.")
     case "login":
+        guard let user = asUser, !user.isEmpty else {
+            throw GitwError.usage("login requires --as <github_username>\n\n" + usage())
+        }
         guard args.count >= 2 else {
             throw GitwError.usage("login requires a GitHub HTTPS repo URL\n\n" + usage())
         }
         let repoURL = args[1]
         try URLPolicy.validateGitArguments([repoURL])
 
-        let username = try TTY.readLine(prompt: "GitHub username: ")
+        // Username is the identity selector; don't prompt for it.
+        let username = user
         let token = try TTY.readSecret(prompt: "GitHub personal access token: ")
 
         // Verify using ls-remote via askpass broker (without storing unless it works).
@@ -89,9 +106,12 @@ do {
         }
 
         try KeychainStore.save(GitHubCredentials(username: username, token: token))
-        print("Credentials stored in Keychain for \(KeychainStore.server).")
+        print("Credentials stored in Keychain for \(username) (\(KeychainStore.server)).")
     default:
-        let creds = try KeychainStore.load()
+        guard let user = asUser, !user.isEmpty else {
+            throw GitwError.usage("git invocation requires --as <github_username>\n\n" + usage())
+        }
+        let creds = try KeychainStore.load(username: user)
         let status = try GitRunner.runGit(args: args, askpassPath: askpassPath(), creds: creds)
         exit(status)
     }

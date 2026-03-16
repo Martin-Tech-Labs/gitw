@@ -16,11 +16,12 @@ public enum KeychainStore {
     public static let server = "github.com"
     private static let service = "gitw"
 
-    public static func load() throws -> GitHubCredentials? {
+    public static func load(username: String) throws -> GitHubCredentials? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassInternetPassword,
             kSecAttrServer as String: server,
             kSecAttrProtocol as String: kSecAttrProtocolHTTPS,
+            kSecAttrAccount as String: username,
             kSecMatchLimit as String: kSecMatchLimitOne,
             kSecReturnAttributes as String: true,
             kSecReturnData as String: true,
@@ -79,11 +80,12 @@ public enum KeychainStore {
         }
     }
 
-    public static func delete() throws {
+    public static func delete(username: String) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassInternetPassword,
             kSecAttrServer as String: server,
             kSecAttrProtocol as String: kSecAttrProtocolHTTPS,
+            kSecAttrAccount as String: username,
             kSecAttrLabel as String: service
         ]
         let status = SecItemDelete(query as CFDictionary)
