@@ -6,6 +6,8 @@
 
 `gitw` is a **secure Git wrapper for macOS** that:
 
+> Portability note: `gitw` intentionally runs **only** `/usr/bin/git` (no PATH lookup) and enforces a code-signature requirement on that binary.
+
 - Allows **GitHub HTTPS only** (`https://github.com/...`).
 - Stores GitHub credentials in the **macOS Keychain**.
 - Authenticates via an **in-memory ASKPASS broker** over a **Unix domain socket** (one-time serve, timeout).
