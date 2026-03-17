@@ -13,7 +13,10 @@ final class MockKeychain: KeychainProviding {
         return profileByAlias[alias]
     }
 
-    func save(alias: String, profile: GitwProfile) throws {
+    func save(alias: String, profile: GitwProfile, overwrite: Bool) throws {
+        if overwrite == false, profileByAlias[alias] != nil {
+            throw GitwError.keychain("Keychain item already exists for alias \(alias).")
+        }
         saved.append((alias, profile))
         profileByAlias[alias] = profile
     }

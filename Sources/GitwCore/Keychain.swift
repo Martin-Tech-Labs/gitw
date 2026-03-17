@@ -34,6 +34,17 @@ public enum KeychainStore {
     // Use a dedicated service name to avoid collisions with other tooling.
     public static let service = "gitw.github.com"
 
+    internal static func friendly(status: OSStatus, op: String) -> String {
+        switch status {
+        case errSecDuplicateItem:
+            return "\(op) failed: Keychain item already exists."
+        case errSecInteractionNotAllowed:
+            return "\(op) failed: Keychain interaction not allowed (-25308). Possibly using the wrong user/session. Run as the logged-in GUI user and ensure the login keychain is unlocked."
+        default:
+            return "\(op) failed: \(status)"
+        }
+    }
+
     /// Load credentials for a given alias.
     ///
     /// - alias: Local selector key. Not necessarily the GitHub username.
@@ -51,7 +62,7 @@ public enum KeychainStore {
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         if status == errSecItemNotFound { return nil }
         guard status == errSecSuccess else {
-            throw GitwError.keychain("SecItemCopyMatching failed: \(status)")
+            throw GitwError.keychain(friendly(status: status, op: "SecItemCopyMatching"))
         }
         guard
             let dict = item as? [String: Any],
@@ -70,7 +81,7 @@ public enum KeychainStore {
     }
 
     /// Save credentials under a local alias.
-    public static func save(alias: String, profile: GitwProfile) throws {
+    public static func save(alias: String, profile: GitwProfile, overwrite: Bool) throws {
         let json = try JSONEncoder().encode(profile)
 
         let attrs: [String: Any] = [
@@ -85,6 +96,9 @@ public enum KeychainStore {
 
         let status = SecItemAdd(attrs as CFDictionary, nil)
         if status == errSecDuplicateItem {
+            if !overwrite {
+                throw GitwError.keychain("Keychain item already exists for alias \(alias).")
+            }
             let query: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,
                 kSecAttrService as String: service,
@@ -95,12 +109,12 @@ public enum KeychainStore {
             ]
             let s2 = SecItemUpdate(query as CFDictionary, update as CFDictionary)
             guard s2 == errSecSuccess else {
-                throw GitwError.keychain("SecItemUpdate failed: \(s2)")
+                throw GitwError.keychain(friendly(status: s2, op: "SecItemUpdate"))
             }
             return
         }
         guard status == errSecSuccess else {
-            throw GitwError.keychain("SecItemAdd failed: \(status)")
+            throw GitwError.keychain(friendly(status: status, op: "SecItemAdd"))
         }
     }
 
@@ -113,7 +127,7 @@ public enum KeychainStore {
         let status = SecItemDelete(query as CFDictionary)
         if status == errSecItemNotFound { return }
         guard status == errSecSuccess else {
-            throw GitwError.keychain("SecItemDelete failed: \(status)")
+            throw GitwError.keychain(friendly(status: status, op: "SecItemDelete"))
         }
     }
 }
