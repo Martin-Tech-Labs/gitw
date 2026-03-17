@@ -127,7 +127,7 @@ Run locally:
 What they cover (high level):
 - `gitw` fails closed when `--as <alias>` is missing.
 
-## Usage
+## Usage 
 
 ### 1) Login (store a PAT in Keychain)
 
