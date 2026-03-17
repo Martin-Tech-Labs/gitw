@@ -78,7 +78,9 @@ public struct GitwApp {
                 throw GitwError.usage("login requires --email <email>")
             }
 
-            let username = try ttyReadLine("GitHub username: ")
+            // `--name` is the GitHub username (and also the commit author name we pass via env).
+            // Do not prompt for username again.
+            let username = name
             let token = try ttyReadSecret("GitHub personal access token: ")
 
             let profile = GitwProfile(githubUsername: username, token: token, gitName: name, gitEmail: email)
