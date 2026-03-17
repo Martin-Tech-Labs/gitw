@@ -37,7 +37,7 @@ public enum GitRunner {
         return GitEnvironment(gitPath: systemGit, requirementUsed: req)
     }
 
-    public static func runGit(args: [String], askpassPath: String, creds: GitHubCredentials?) throws -> Int32 {
+    public static func runGit(args: [String], askpassPath: String, profile: GitwProfile?) throws -> Int32 {
         // Always validate arguments we can see.
         try URLPolicy.validateGitArguments(args)
 
@@ -53,7 +53,9 @@ public enum GitRunner {
 
         var broker: AskpassBroker?
         var tmpDir: URL?
-        if let creds {
+        if let profile {
+            let creds = profile.creds
+
             guard FileManager.default.isExecutableFile(atPath: askpassPath) else {
                 throw GitwError.io("askpass helper not found or not executable at: \(askpassPath)")
             }
@@ -83,9 +85,10 @@ public enum GitRunner {
             env = buildGitEnvironment(base: env,
                                      askpassPath: askpassPath,
                                      brokerSocket: sock,
-                                     brokerNonce: nonce)
+                                     brokerNonce: nonce,
+                                     profile: profile)
         } else {
-            // No credentials. Askpass is not set; git will fail closed if it prompts.
+            // No profile. Askpass is not set; git will fail closed if it prompts.
         }
 
         defer {
@@ -113,7 +116,8 @@ public enum GitRunner {
     public static func buildGitEnvironment(base: [String: String],
                                           askpassPath: String? = nil,
                                           brokerSocket: String? = nil,
-                                          brokerNonce: String? = nil) -> [String: String] {
+                                          brokerNonce: String? = nil,
+                                          profile: GitwProfile? = nil) -> [String: String] {
         var env = base
 
         // Fail closed: never allow terminal prompting.
@@ -137,6 +141,14 @@ public enum GitRunner {
             env["SSH_ASKPASS"] = askpassPath
             env["GITW_SOCKET"] = brokerSocket
             env["GITW_NONCE"] = brokerNonce
+        }
+
+        if let profile {
+            // Force commit identity from Keychain profile for every invocation.
+            env["GIT_AUTHOR_NAME"] = profile.gitName
+            env["GIT_AUTHOR_EMAIL"] = profile.gitEmail
+            env["GIT_COMMITTER_NAME"] = profile.gitName
+            env["GIT_COMMITTER_EMAIL"] = profile.gitEmail
         }
 
         return env

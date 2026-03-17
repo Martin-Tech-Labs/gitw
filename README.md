@@ -134,13 +134,17 @@ What they cover (high level):
 `login` **verifies** the token by running `git ls-remote` via the broker and **only stores on success**.
 
 ```bash
-gitw login --as <alias> https://github.com/OWNER/REPO.git
+gitw login --as <alias> --name "Your Name" --email you@example.com https://github.com/OWNER/REPO.git
 ```
 
 You’ll be prompted for:
 
 - GitHub username
 - GitHub Personal Access Token (PAT)
+
+The name/email are passed to Git on every invocation as:
+- `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`
+- `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL`
 
 ### 2) Use `gitw` like `git`
 

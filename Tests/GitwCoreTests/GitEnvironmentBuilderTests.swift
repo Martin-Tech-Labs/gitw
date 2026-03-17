@@ -31,12 +31,17 @@ struct GitEnvironmentBuilderTests {
             base: [:],
             askpassPath: "/usr/local/bin/gitw-askpass",
             brokerSocket: "/tmp/sock",
-            brokerNonce: "nonce"
+            brokerNonce: "nonce",
+            profile: GitwProfile(githubUsername: "u", token: "t", gitName: "N", gitEmail: "e@example.com")
         )
 
         #expect(env["GIT_ASKPASS"] == "/usr/local/bin/gitw-askpass")
         #expect(env["SSH_ASKPASS"] == "/usr/local/bin/gitw-askpass")
         #expect(env["GITW_SOCKET"] == "/tmp/sock")
         #expect(env["GITW_NONCE"] == "nonce")
+        #expect(env["GIT_AUTHOR_NAME"] == "N")
+        #expect(env["GIT_AUTHOR_EMAIL"] == "e@example.com")
+        #expect(env["GIT_COMMITTER_NAME"] == "N")
+        #expect(env["GIT_COMMITTER_EMAIL"] == "e@example.com")
     }
 }
