@@ -125,7 +125,7 @@ Run locally:
 ```
 
 What they cover (high level):
-- `gitw` fails closed when `--as <alias>` is missing.
+- `gitw` fails closed when `--as <alias>` is missing. 
 
 ## Usage 
 
