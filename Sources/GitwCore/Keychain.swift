@@ -30,8 +30,9 @@ public struct GitwProfile: Sendable, Codable, Equatable {
 }
 
 public enum KeychainStore {
-    // We deliberately keep this fixed; gitw only supports GitHub HTTPS.
-    public static let server = "github.com"
+    // Keychain namespace. We still authenticate against github.com, but we store credentials
+    // under a dedicated Keychain server name to avoid collisions with other GitHub tooling.
+    public static let server = "gitw.github.com"
     private static let service = "gitw"
 
     /// Load credentials for a given alias.

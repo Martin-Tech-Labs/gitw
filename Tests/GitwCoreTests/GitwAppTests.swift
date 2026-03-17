@@ -59,9 +59,9 @@ struct GitwAppTests {
 
         let status = try app.run(
             .login(alias: "work", repoURL: "https://github.com/OWNER/REPO.git"),
-            ttyReadLine: { _ in "real-user" },
+            ttyReadLine: { _ in throw GitwError.io("unexpected ttyReadLine") },
             ttyReadSecret: { _ in "tok" },
-            name: "Real Name",
+            name: "real-user",
             email: "real@example.com"
         )
 
@@ -69,11 +69,12 @@ struct GitwAppTests {
         #expect(git.calls.count == 1)
         #expect(git.calls[0].args == ["ls-remote", "https://github.com/OWNER/REPO.git"])
         #expect(git.calls[0].githubUsername == "real-user")
-        #expect(git.calls[0].name == "Real Name")
+        #expect(git.calls[0].name == "real-user")
         #expect(git.calls[0].email == "real@example.com")
         #expect(kc.saved.count == 1)
         #expect(kc.saved[0].alias == "work")
         #expect(kc.saved[0].profile.githubUsername == "real-user")
+        #expect(kc.saved[0].profile.gitName == "real-user")
     }
 
     @Test
@@ -87,9 +88,9 @@ struct GitwAppTests {
         do {
             _ = try app.run(
                 .login(alias: "work", repoURL: "https://github.com/OWNER/REPO.git"),
-                ttyReadLine: { _ in "real-user" },
+                ttyReadLine: { _ in throw GitwError.io("unexpected ttyReadLine") },
                 ttyReadSecret: { _ in "tok" },
-                name: "Real Name",
+                name: "real-user",
                 email: "real@example.com"
             )
             Issue.record("Expected login to fail")
