@@ -211,10 +211,9 @@ sequenceDiagram
   participant A as gitw-askpass
 
   U->>W: gitw <git args>
-  W->>KC: Load username + token (Keychain)
+  W->>KC: Load profile (github username + token + name + email)
   W->>B: Start broker
-  Note over W,B: Create temp dir (0700) under FileManager.temporaryDirectory
-  Note over W,B: (typically /var/folders/.../T/ on macOS)
+  Note over W,B: Create temp dir (0700) under /tmp
   Note over W,B: Create UDS socket at <tempdir>/askpass.sock
   Note over W,B: Generate random nonce
   W->>G: exec git with env:
@@ -223,6 +222,7 @@ sequenceDiagram
   Note over W,G: GITW_NONCE=<random>
   Note over W,G: GIT_TERMINAL_PROMPT=0
   Note over W,G: credential.helper disabled via GIT_CONFIG_COUNT
+  Note over W,G: GIT_AUTHOR_* and GIT_COMMITTER_* set from Keychain profile
 
   G->>A: invoke askpass("Username for https://github.com")
   A->>B: connect to UDS + send nonce + request "username"
