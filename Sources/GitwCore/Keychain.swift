@@ -75,11 +75,10 @@ public enum KeychainStore {
             }
         }
 
-        // We expect profile JSON for all entries in this design.
-        // If it's missing, fail closed.
+        // Name/email not present in legacy entries; we fail closed because the design now requires them.
         let username = (dict[kSecAttrComment as String] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
         let hint = (username?.isEmpty == false) ? username! : accountAlias
-        throw GitwError.keychain("profile for alias \(accountAlias) is missing profile metadata (expected JSON). Please re-run login for this alias (github username was \(hint)).")
+        throw GitwError.keychain("profile for alias \(accountAlias) is missing name/email (legacy entry). Please re-run: gitw login --as \(accountAlias) --name ... --email ... (github username was \(hint))")
     }
 
     /// Save credentials under a local alias.
