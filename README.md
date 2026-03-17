@@ -134,13 +134,17 @@ What they cover (high level):
 `login` **verifies** the token by running `git ls-remote` via the broker and **only stores on success**.
 
 ```bash
-gitw login --as <alias> https://github.com/OWNER/REPO.git
+gitw login --as <alias> --name "Your Name" --email you@example.com https://github.com/OWNER/REPO.git
 ```
 
 You’ll be prompted for:
 
 - GitHub username
 - GitHub Personal Access Token (PAT)
+
+The name/email are passed to Git on every invocation as:
+- `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`
+- `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL`
 
 ### 2) Use `gitw` like `git`
 
@@ -207,10 +211,9 @@ sequenceDiagram
   participant A as gitw-askpass
 
   U->>W: gitw <git args>
-  W->>KC: Load username + token (Keychain)
+  W->>KC: Load profile (github username + token + name + email)
   W->>B: Start broker
-  Note over W,B: Create temp dir (0700) under FileManager.temporaryDirectory
-  Note over W,B: (typically /var/folders/.../T/ on macOS)
+  Note over W,B: Create temp dir (0700) under /tmp
   Note over W,B: Create UDS socket at <tempdir>/askpass.sock
   Note over W,B: Generate random nonce
   W->>G: exec git with env:
@@ -219,6 +222,7 @@ sequenceDiagram
   Note over W,G: GITW_NONCE=<random>
   Note over W,G: GIT_TERMINAL_PROMPT=0
   Note over W,G: credential.helper disabled via GIT_CONFIG_COUNT
+  Note over W,G: GIT_AUTHOR_* and GIT_COMMITTER_* set from Keychain profile
 
   G->>A: invoke askpass("Username for https://github.com")
   A->>B: connect to UDS + send nonce + request "username"

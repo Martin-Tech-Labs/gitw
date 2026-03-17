@@ -6,7 +6,7 @@ private func usage() -> String {
     gitw - secure Git wrapper (GitHub HTTPS + Keychain)
 
     Usage:
-      gitw login --as <alias> <https://github.com/owner/repo.git>
+      gitw login --as <alias> --name <name> --email <email> <https://github.com/owner/repo.git>
       gitw logout --as <alias>
       gitw whoami --as <alias>
       gitw <git-args...> --as <alias>
@@ -78,29 +78,44 @@ do {
     case "-h", "--help", "help":
         throw GitwError.usage(usage())
     case "whoami":
-        let creds = try keychain.load(alias: alias)
-        guard let creds else {
-            die("No GitHub credentials in Keychain for alias \(alias).", code: 1)
+        let profile = try keychain.load(alias: alias)
+        guard let profile else {
+            die("No profile in Keychain for alias \(alias).", code: 1)
         }
-        print(creds.username)
+        print(profile.githubUsername)
+        print("name=\(profile.gitName)")
+        print("email=\(profile.gitEmail)")
         exit(0)
     case "logout":
         _ = try app.run(.logout(alias: alias), ttyReadLine: TTY.readLine(prompt:), ttyReadSecret: TTY.readSecret(prompt:))
         print("Deleted GitHub credentials for alias \(alias) (\(KeychainStore.server)) from Keychain.")
         exit(0)
     case "login":
+        // login requires a repo URL plus identity fields stored in Keychain.
+        let name = popFlag("--name")
+        let email = popFlag("--email")
+
+        guard let name, !name.isEmpty else {
+            throw GitwError.usage("login requires --name <name>\n\n" + usage())
+        }
+        guard let email, !email.isEmpty else {
+            throw GitwError.usage("login requires --email <email>\n\n" + usage())
+        }
         guard args.count >= 2 else {
             throw GitwError.usage("login requires a GitHub HTTPS repo URL\n\n" + usage())
         }
         let repoURL = args[1]
-        // We keep the prompts + verification inside GitwApp, but printing stays here.
-        let status = try app.run(.login(alias: alias, repoURL: repoURL), ttyReadLine: TTY.readLine(prompt:), ttyReadSecret: TTY.readSecret(prompt:))
+
+        let status = try app.run(.login(alias: alias, repoURL: repoURL),
+                                 ttyReadLine: TTY.readLine(prompt:),
+                                 ttyReadSecret: TTY.readSecret(prompt:),
+                                 name: name,
+                                 email: email)
         if status == 0 {
-            // Re-load to show the effective username stored for this alias.
-            if let c = try keychain.load(alias: alias) {
-                print("Credentials stored in Keychain for alias \(alias) (user \(c.username), \(KeychainStore.server)).")
+            if let p = try keychain.load(alias: alias) {
+                print("Profile stored in Keychain for alias \(alias) (github=\(p.githubUsername), name=\(p.gitName), email=\(p.gitEmail)).")
             } else {
-                print("Credentials stored in Keychain for alias \(alias) (\(KeychainStore.server)).")
+                print("Profile stored in Keychain for alias \(alias).")
             }
         }
         exit(status)

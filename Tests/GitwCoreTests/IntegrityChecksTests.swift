@@ -26,10 +26,10 @@ struct IntegrityChecksTests {
                                        contents: Data("#!/bin/sh\necho nope\n".utf8))
         _ = chmod(fakeAskpass, 0o755)
 
-        let creds = GitHubCredentials(username: "u", token: "t")
+        let profile = GitwProfile(githubUsername: "u", token: "t", gitName: "N", gitEmail: "e@example.com")
 
         do {
-            _ = try GitRunner.runGit(args: ["--version"], askpassPath: fakeAskpass, creds: creds)
+            _ = try GitRunner.runGit(args: ["--version"], askpassPath: fakeAskpass, profile: profile)
             Issue.record("Expected runGit to fail due to askpass hash mismatch")
         } catch let e as GitwError {
             switch e {
