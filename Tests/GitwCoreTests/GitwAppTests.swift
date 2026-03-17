@@ -37,13 +37,13 @@ final class MockGit: GitRunning {
     var calls: [Call] = []
     var nextStatus: Int32 = 0
 
-    func runGit(args: [String], askpassPath: String, profile: GitwProfile?) throws -> Int32 {
+    func runGit(args: [String], askpassPath: String, profile: GitwProfile) throws -> Int32 {
         calls.append(.init(args: args,
                            askpassPath: askpassPath,
-                           githubUsername: profile?.githubUsername,
-                           token: profile?.token,
-                           name: profile?.gitName,
-                           email: profile?.gitEmail))
+                           githubUsername: profile.githubUsername,
+                           token: profile.token,
+                           name: profile.gitName,
+                           email: profile.gitEmail))
         return nextStatus
     }
 }

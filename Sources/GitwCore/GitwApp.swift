@@ -7,7 +7,7 @@ public protocol KeychainProviding {
 }
 
 public protocol GitRunning {
-    func runGit(args: [String], askpassPath: String, profile: GitwProfile?) throws -> Int32
+    func runGit(args: [String], askpassPath: String, profile: GitwProfile) throws -> Int32
 }
 
 public struct RealKeychainProvider: KeychainProviding {
@@ -29,7 +29,7 @@ public struct RealKeychainProvider: KeychainProviding {
 public struct RealGitRunner: GitRunning {
     public init() {}
 
-    public func runGit(args: [String], askpassPath: String, profile: GitwProfile?) throws -> Int32 {
+    public func runGit(args: [String], askpassPath: String, profile: GitwProfile) throws -> Int32 {
         try GitRunner.runGit(args: args, askpassPath: askpassPath, profile: profile)
     }
 }
@@ -97,7 +97,9 @@ public struct GitwApp {
             return 0
 
         case .git(let alias, let args):
-            let profile = try keychain.load(alias: alias)
+            guard let profile = try keychain.load(alias: alias) else {
+                throw GitwError.io("No profile in Keychain for alias \(alias).")
+            }
             let status = try git.runGit(args: args, askpassPath: askpassPath(), profile: profile)
             return status
         }

@@ -12,7 +12,7 @@ struct GitEnvironmentBuilderTests {
             "GIT_SSH_COMMAND": "evil"
         ]
 
-        let env = GitRunner.buildGitEnvironment(base: base)
+        let env = GitRunner.buildGitEnvironment(base: base, profile: GitwProfile(githubUsername: "u", token: "t", gitName: "n", gitEmail: "e@example.com"))
 
         #expect(env["GIT_TERMINAL_PROMPT"] == "0")
         #expect(env["GIT_CONFIG_COUNT"] == "2")
