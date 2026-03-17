@@ -88,7 +88,7 @@ do {
         exit(0)
     case "logout":
         _ = try app.run(.logout(alias: alias), ttyReadLine: TTY.readLine(prompt:), ttyReadSecret: TTY.readSecret(prompt:))
-        print("Deleted GitHub credentials for alias \(alias) (\(KeychainStore.server)) from Keychain.")
+        print("Deleted GitHub credentials for alias \(alias) (\(KeychainStore.service)) from Keychain.")
         exit(0)
     case "login":
         // login requires a repo URL plus identity fields stored in Keychain.
