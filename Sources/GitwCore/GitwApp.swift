@@ -2,7 +2,9 @@ import Foundation
 
 public protocol KeychainProviding {
     func load(alias: String) throws -> GitwProfile?
-    func save(alias: String, profile: GitwProfile) throws
+    /// Save a profile under alias.
+    /// - overwrite: if false, this must fail if the item already exists.
+    func save(alias: String, profile: GitwProfile, overwrite: Bool) throws
     func delete(alias: String) throws
 }
 
@@ -17,8 +19,8 @@ public struct RealKeychainProvider: KeychainProviding {
         try KeychainStore.load(alias: alias)
     }
 
-    public func save(alias: String, profile: GitwProfile) throws {
-        try KeychainStore.save(alias: alias, profile: profile)
+    public func save(alias: String, profile: GitwProfile, overwrite: Bool) throws {
+        try KeychainStore.save(alias: alias, profile: profile, overwrite: overwrite)
     }
 
     public func delete(alias: String) throws {
@@ -95,7 +97,21 @@ public struct GitwApp {
                 throw GitwError.io("Login check failed (git exit \(status)). Not saved.")
             }
 
-            try keychain.save(alias: alias, profile: profile)
+            do {
+                try keychain.save(alias: alias, profile: profile, overwrite: false)
+            } catch let e as GitwError {
+                // If the key already exists, ask whether to overwrite.
+                if case .keychain(let msg) = e, msg.contains("already exists") {
+                    let ans = try ttyReadLine("Keychain item already exists for alias \(alias). Override? (y/N): ")
+                    if ans.lowercased().hasPrefix("y") {
+                        try keychain.save(alias: alias, profile: profile, overwrite: true)
+                    } else {
+                        throw GitwError.denied("Aborted.")
+                    }
+                } else {
+                    throw e
+                }
+            }
             return 0
 
         case .git(let alias, let args):

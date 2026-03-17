@@ -30,116 +30,104 @@ public struct GitwProfile: Sendable, Codable, Equatable {
 }
 
 public enum KeychainStore {
-    // Keychain namespace. We still authenticate against github.com, but we store credentials
-    // under a dedicated Keychain server name to avoid collisions with other GitHub tooling.
-    public static let server = "gitw.github.com"
-    private static let service = "gitw"
+    // Keychain namespace. We store the full profile as a single Keychain item.
+    // Use a dedicated service name to avoid collisions with other tooling.
+    public static let service = "gitw.github.com"
+
+    internal static func friendly(status: OSStatus, op: String) -> String {
+        switch status {
+        case errSecDuplicateItem:
+            return "\(op) failed: Keychain item already exists."
+        case errSecInteractionNotAllowed:
+            return "\(op) failed: Keychain interaction not allowed (-25308). Possibly using the wrong user/session. Run as the logged-in GUI user and ensure the login keychain is unlocked."
+        default:
+            return "\(op) failed: \(status)"
+        }
+    }
 
     /// Load credentials for a given alias.
     ///
     /// - alias: Local selector key. Not necessarily the GitHub username.
     public static func load(alias: String) throws -> GitwProfile? {
         let query: [String: Any] = [
-            kSecClass as String: kSecClassInternetPassword,
-            kSecAttrServer as String: server,
-            kSecAttrProtocol as String: kSecAttrProtocolHTTPS,
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
             kSecAttrAccount as String: alias,
             kSecMatchLimit as String: kSecMatchLimitOne,
             kSecReturnAttributes as String: true,
-            kSecReturnData as String: true,
-            kSecAttrLabel as String: service
+            kSecReturnData as String: true
         ]
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         if status == errSecItemNotFound { return nil }
         guard status == errSecSuccess else {
-            throw GitwError.keychain("SecItemCopyMatching failed: \(status)")
+            throw GitwError.keychain(friendly(status: status, op: "SecItemCopyMatching"))
         }
         guard
             let dict = item as? [String: Any],
             let accountAlias = dict[kSecAttrAccount as String] as? String,
-            let data = dict[kSecValueData as String] as? Data,
-            let _ = String(data: data, encoding: .utf8)
+            let data = dict[kSecValueData as String] as? Data
         else {
             throw GitwError.keychain("unexpected keychain item shape")
         }
 
-        // Primary storage: JSON in kSecAttrGeneric.
-        if let generic = dict[kSecAttrGeneric as String] as? Data {
-            do {
-                let p = try JSONDecoder().decode(GitwProfile.self, from: generic)
-                return p
-            } catch {
-                throw GitwError.keychain("failed to decode profile JSON: \(error)")
-            }
+        do {
+            return try JSONDecoder().decode(GitwProfile.self, from: data)
+        } catch {
+            // Fail closed: profile is required for gitw to operate.
+            throw GitwError.keychain("profile for alias \(accountAlias) is missing profile metadata (expected JSON). Please re-run login for this alias.")
         }
-
-        // We expect profile JSON for all entries in this design.
-        // If it's missing, fail closed.
-        let username = (dict[kSecAttrComment as String] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let hint = (username?.isEmpty == false) ? username! : accountAlias
-        throw GitwError.keychain("profile for alias \(accountAlias) is missing profile metadata (expected JSON). Please re-run login for this alias (github username was \(hint)).")
     }
 
     /// Save credentials under a local alias.
-    public static func save(alias: String, profile: GitwProfile) throws {
-        let tokenData = Data(profile.token.utf8)
-        let generic = try JSONEncoder().encode(profile)
+    public static func save(alias: String, profile: GitwProfile, overwrite: Bool) throws {
+        let json = try JSONEncoder().encode(profile)
 
         let attrs: [String: Any] = [
-            kSecClass as String: kSecClassInternetPassword,
-            kSecAttrServer as String: server,
-            kSecAttrProtocol as String: kSecAttrProtocolHTTPS,
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
             // Account is the selector alias.
             kSecAttrAccount as String: alias,
-            // Store actual GitHub username separately (also kept for human inspection).
-            kSecAttrComment as String: profile.githubUsername,
-            // Store full profile JSON.
-            kSecAttrGeneric as String: generic,
-            // Secret token stays as value data.
-            kSecValueData as String: tokenData,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
-            kSecAttrLabel as String: service
+            // Full profile JSON stored as the secret payload.
+            kSecValueData as String: json,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
         ]
 
         let status = SecItemAdd(attrs as CFDictionary, nil)
         if status == errSecDuplicateItem {
+            if !overwrite {
+                throw GitwError.keychain("Keychain item already exists for alias \(alias).")
+            }
             let query: [String: Any] = [
-                kSecClass as String: kSecClassInternetPassword,
-                kSecAttrServer as String: server,
-                kSecAttrProtocol as String: kSecAttrProtocolHTTPS,
-                kSecAttrAccount as String: alias,
-                kSecAttrLabel as String: service
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: alias
             ]
             let update: [String: Any] = [
-                kSecAttrComment as String: profile.githubUsername,
-                kSecAttrGeneric as String: generic,
-                kSecValueData as String: tokenData
+                kSecValueData as String: json
             ]
             let s2 = SecItemUpdate(query as CFDictionary, update as CFDictionary)
             guard s2 == errSecSuccess else {
-                throw GitwError.keychain("SecItemUpdate failed: \(s2)")
+                throw GitwError.keychain(friendly(status: s2, op: "SecItemUpdate"))
             }
             return
         }
         guard status == errSecSuccess else {
-            throw GitwError.keychain("SecItemAdd failed: \(status)")
+            throw GitwError.keychain(friendly(status: status, op: "SecItemAdd"))
         }
     }
 
     public static func delete(alias: String) throws {
         let query: [String: Any] = [
-            kSecClass as String: kSecClassInternetPassword,
-            kSecAttrServer as String: server,
-            kSecAttrProtocol as String: kSecAttrProtocolHTTPS,
-            kSecAttrAccount as String: alias,
-            kSecAttrLabel as String: service
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: alias
         ]
         let status = SecItemDelete(query as CFDictionary)
         if status == errSecItemNotFound { return }
         guard status == errSecSuccess else {
-            throw GitwError.keychain("SecItemDelete failed: \(status)")
+            throw GitwError.keychain(friendly(status: status, op: "SecItemDelete"))
         }
     }
 }
